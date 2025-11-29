@@ -1,9 +1,15 @@
+#![feature(portable_simd)]
+#![feature(slice_split_once)]
+
 use std::{
     collections::{BTreeMap, HashMap},
     ffi::{c_int, c_void},
     fs::File,
     os::fd::AsRawFd,
+    simd::{cmp::SimdPartialEq, u8x64},
 };
+
+const SEMI: u8x64 = u8x64::splat(b';');
 
 fn main() {
     let f = File::open("measurements.txt").unwrap();
@@ -12,28 +18,11 @@ fn main() {
     let mut stats = HashMap::<Vec<u8>, (i16, i64, usize, i16)>::new();
     let mut at = 0;
     loop {
-        let rest = &map[at..];
-        // SAFETY: rest is valid for at least rest.len() bytes
-        let next_newline =
-            unsafe { libc::memchr(rest.as_ptr() as *const c_void, b'\n' as c_int, rest.len()) };
-        let line = if next_newline.is_null() {
-            // don't need to remember to break, since next iteration will find empty line
-            rest
-        } else {
-            // SAFETY: memchr always returns pointers in rest, which are valid
-            let len = unsafe { (next_newline as *const u8).offset_from(rest.as_ptr()) } as usize;
-            &rest[..len]
-        };
-        at += line.len() + 1;
+        let line = next_line(map, &mut at);
         if line.is_empty() {
             break;
         }
-        let mut fields = line.rsplitn(2, |c| *c == b';');
-        let (Some(temperature), Some(station)) = (fields.next(), fields.next()) else {
-            panic!("bad line: {}", unsafe {
-                std::str::from_utf8_unchecked(line)
-            });
-        };
+        let (station, temperature) = split_semi(line);
         let t = parse_temperature(temperature);
         let stats = match stats.get_mut(station) {
             Some(stats) => stats,
@@ -66,6 +55,35 @@ fn main() {
         }
     }
     print!("}}");
+}
+
+fn next_line<'a>(map: &'a [u8], at: &mut usize) -> &'a [u8] {
+    let rest = &map[*at..];
+    // SAFETY: rest is valid for at least rest.len() bytes
+    let next_newline =
+        unsafe { libc::memchr(rest.as_ptr() as *const c_void, b'\n' as c_int, rest.len()) };
+    let line = if next_newline.is_null() {
+        // don't need to remember to break, since next iteration will find empty line
+        rest
+    } else {
+        // SAFETY: memchr always returns pointers in rest, which are valid
+        let len = unsafe { (next_newline as *const u8).offset_from(rest.as_ptr()) } as usize;
+        &rest[..len]
+    };
+    *at += line.len() + 1;
+    line
+}
+
+fn split_semi(line: &[u8]) -> (&[u8], &[u8]) {
+    // we know, line is at most 100+1+5 = 106b
+    if line.len() > 64 {
+        line.rsplit_once(|c| *c == b';').unwrap()
+    } else {
+        let delim_eq = SEMI.simd_eq(u8x64::load_or_default(line));
+        // SAFETY: we're promised there is a ; in every line
+        let index_of_delim = unsafe { delim_eq.first_set().unwrap_unchecked() };
+        (&line[..index_of_delim], &line[index_of_delim + 1..])
+    }
 }
 
 fn parse_temperature(temperature: &[u8]) -> i16 {
