@@ -7,6 +7,7 @@ use std::{
 fn main() {
     let f = File::open("measurements.txt").unwrap();
     let map = mmap(&f);
+    // TODO: maybe make the key &[u8], but measure since we're breaking MADV_SEQUENTIAL
     let mut stats = HashMap::<Vec<u8>, (f64, f64, usize, f64)>::new();
     for line in map.split(|c| *c == b'\n') {
         if line.is_empty() {
