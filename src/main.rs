@@ -167,8 +167,8 @@ fn main() {
                     Entry::Occupied(some) => {
                         let stat = some.into_mut();
                         stat.0 = stat.0.min(v.0);
-                        stat.1 += stat.1;
-                        stat.2 += stat.2;
+                        stat.1 += v.1;
+                        stat.2 += v.2;
                         stat.3 = stat.3.max(v.3);
                     }
                 }
