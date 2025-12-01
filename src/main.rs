@@ -373,11 +373,11 @@ fn mmap(f: &File) -> &'_ [u8] {
             hfile,
             std::ptr::null_mut(),
             PAGE_READONLY,
-            ((len as u64) >> 32) as u32,
-            (len as u64 & 0xFFFF_FFFF) as u32,
+            0,
+            0,
             std::ptr::null(),
         );
-        
+
         if hmap == std::ptr::null_mut() {
             panic!("{:?}", std::io::Error::last_os_error());
         }
