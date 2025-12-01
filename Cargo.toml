@@ -10,3 +10,4 @@ debug = true
 
 [dependencies]
 libc = "0.2.177"
+windows-sys = { version = "0.61.2", features = ["Win32_System_Memory", "Win32_Foundation", "Win32_Security"] }
