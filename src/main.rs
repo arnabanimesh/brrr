@@ -365,7 +365,7 @@ fn mmap(f: &File) -> &'_ [u8] {
         CreateFileMappingW, FILE_MAP_READ, MapViewOfFile, PAGE_READONLY,
     };
 
-    let len = f.metadata().unwrap().len() as usize;
+    let len = f.metadata().unwrap().len();
     unsafe {
         let hfile = f.as_raw_handle();
 
@@ -388,6 +388,6 @@ fn mmap(f: &File) -> &'_ [u8] {
             panic!("{:?}", std::io::Error::last_os_error());
         }
 
-        std::slice::from_raw_parts(view.Value as *const u8, len)
+        std::slice::from_raw_parts(view.Value as *const u8, len as usize)
     }
 }
