@@ -11,7 +11,6 @@ use std::{
     fs::File,
     hash::{BuildHasher, Hash, Hasher},
     mem::ManuallyDrop,
-    os::fd::AsRawFd,
     simd::{Simd, cmp::SimdPartialEq},
 };
 
