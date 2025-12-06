@@ -15,6 +15,9 @@ use std::{
     simd::{Simd, cmp::SimdPartialEq},
 };
 
+const HASH_K: u64 = 0xf1357aea2e62a9c5;
+const HASH_SEED: u64 = 0x13198a2e03707344;
+
 struct FastHasherBuilder;
 struct FastHasher(u64);
 
@@ -22,27 +25,34 @@ impl BuildHasher for FastHasherBuilder {
     type Hasher = FastHasher;
 
     fn build_hasher(&self) -> Self::Hasher {
-        FastHasher(0xcbf29ce484222325)
+        FastHasher(0)
     }
 }
 
 impl Hasher for FastHasher {
     fn finish(&self) -> u64 {
-        self.0 ^ self.0.rotate_right(33) ^ self.0.rotate_right(15)
+        self.0.rotate_left(26)
     }
 
     fn write_length_prefix(&mut self, _len: usize) {}
 
     fn write(&mut self, bytes: &[u8]) {
-        let mut word = [0u64; 2];
-        unsafe {
-            std::ptr::copy(
-                bytes.as_ptr(),
-                word.as_mut_ptr().cast::<u8>(),
-                bytes.len().min(16),
-            )
-        };
-        self.0 = word[0] ^ word[1];
+        let len = bytes.len();
+        let mut acc = HASH_SEED;
+
+        match len {
+            0..4 => {
+                let lo = bytes[0];
+                let mid = bytes[len / 2];
+                let hi = bytes[len - 1];
+                acc ^= (lo as u64) | ((mid as u64) << 8) | ((hi as u64) << 16);
+            }
+            4.. => {
+                acc ^= u32::from_le_bytes(bytes[0..4].try_into().unwrap()) as u64;
+            }
+        }
+
+        self.0 = self.0.wrapping_add(acc).wrapping_mul(HASH_K);
     }
 }
 
